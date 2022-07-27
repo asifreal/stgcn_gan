@@ -569,7 +569,7 @@ if __name__ == '__main__':
     pred_len = 3
     normalize = 'zscore'
     C_0 = 1
-    batch_size = 64
+    batch_size = 256
     train_dataset, test_dataset, val_dataset, x_stats = \
         torch_dataset(feat, time_len, test_rate, seq_len, pred_len, normalize=normalize, n_day=44, day_slot=288, C_0=C_0)
     # scale = x_stats['std']
