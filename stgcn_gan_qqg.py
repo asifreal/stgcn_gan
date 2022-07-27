@@ -122,6 +122,8 @@ class Gconv(nn.Module):
         :return: tensor, [batch_size, n_route, c_out].
         """
         super(Gconv, self).__init__()
+        self.dvc = device
+        self.dtp = FLOAT_DTYPE
         # L = scaled_laplacian(adj)
         # Lk = cheb_poly_approx(L, Ks)
         # self.register_buffer(
@@ -158,7 +160,7 @@ class Gconv(nn.Module):
         # import pdb; pdb.set_trace()
         # laplacian = torch.FloatTensor(np.stack(laps)).to(device)
         # laplacian = laplacian.reshape(batch_size, seq_len, n_route, -1)
-        eye = torch.eye(n_route, device=device,dtype=FLOAT_DTYPE).unsqueeze(0).unsqueeze(0).\
+        eye = torch.eye(n_route, device=self.dvc,dtype=self.dtp).unsqueeze(0).unsqueeze(0).\
             expand(batch_size, seq_len, n_route, n_route)
         # print(adj.shape, eye.shape)
         adjacency = adj + eye
@@ -181,6 +183,8 @@ class Gconv(nn.Module):
 class TemporalConv(nn.Module):
     def __init__(self, Kt, c_in, c_out, act_func='relu'):
         super(TemporalConv, self).__init__()
+        self.dvc = device
+        self.dtp = FLOAT_DTYPE
         self.Kt = Kt
         self.c_in = c_in
         self.c_out = c_out
@@ -204,7 +208,7 @@ class TemporalConv(nn.Module):
         if self.c_in > self.c_out:
             x_input = self.conv1(x)
         elif self.c_in < self.c_out:
-            x_input = torch.cat([x, torch.zeros(x.shape[0], self.c_out - self.c_in, T, n, device=device, dtype=FLOAT_DTYPE)], dim=1)
+            x_input = torch.cat([x, torch.zeros(x.shape[0], self.c_out - self.c_in, T, n, device=self.dvc, dtype=self.dtp)], dim=1)
         else:
             x_input = x
         
@@ -230,6 +234,8 @@ class TemporalConv(nn.Module):
 class TemporalConv1(nn.Module):
     def __init__(self, Kt, c_in, c_out, act_func='relu'):
         super(TemporalConv1, self).__init__()
+        self.dvc = device
+        self.dtp = FLOAT_DTYPE
         self.Kt = Kt
         self.c_in = c_in
         self.c_out = c_out
@@ -253,7 +259,7 @@ class TemporalConv1(nn.Module):
         if self.c_in > self.c_out:
             x_input = self.conv1(x)
         elif self.c_in < self.c_out:
-            x_input = torch.cat([x, torch.zeros(x.shape[0], self.c_out - self.c_in, T, n, device=device,dtype=FLOAT_DTYPE)], dim=1)
+            x_input = torch.cat([x, torch.zeros(x.shape[0], self.c_out - self.c_in, T, n, device=self.dvc,dtype=self.dtp)], dim=1)
         else:
             x_input = x
         
@@ -280,12 +286,14 @@ class TemporalConv1(nn.Module):
 class SpatioConv(nn.Module):
     def __init__(self, Ks, c_in, c_out):
         super(SpatioConv, self).__init__()
+        self.dvc = device
+        self.dtp = FLOAT_DTYPE
         self.Ks = Ks
         self.c_in = c_in
         self.c_out = c_out
         
         self.conv1 = nn.Conv2d(c_in, c_out, 1, 1)
-        self.gconv = Gconv(Ks, c_in, c_out)
+        self.gconv = torch.jit.script(Gconv(Ks, c_in, c_out))
 
     def forward(self, x, adj):
         """
@@ -297,7 +305,7 @@ class SpatioConv(nn.Module):
         if self.c_in > self.c_out:
             x_input = self.conv1(x.permute(0,3,1,2)).permute(0,2,3,1)
         elif self.c_in < self.c_out:
-            x_input = torch.cat([x, torch.zeros(x.shape[0], T, n, self.c_out - self.c_in, device=device, dtype=FLOAT_DTYPE)], dim=1)
+            x_input = torch.cat([x, torch.zeros(x.shape[0], T, n, self.c_out - self.c_in, device=self.dvc, dtype=self.dtp)], dim=1)
         else:
             x_input = x
         
@@ -332,7 +340,7 @@ class STConvBlock(nn.Module):
         x = self.tconv1(x)
         x = self.sconv(x, adj)
         x = self.tconv2(x)
-        if self.layer_norm:
+        if self.layer_norm is not None:
             x = self.layer_norm(x)
         x = self.dropout(x)
         return x
@@ -391,6 +399,8 @@ class STGCN(nn.Module):
 class Generator(nn.Module):
     def __init__(self, n_route, n_his, Ks, Kt, blocks, keep_prob, act_func='GLU'):
         super(Generator, self).__init__()
+        self.dvc = device
+        self.dtp = FLOAT_DTYPE
         self.stgcn = STGCN(n_route, n_his, Ks, Kt, blocks, keep_prob, act_func=act_func)
 
     def forward(self, x, adj):
