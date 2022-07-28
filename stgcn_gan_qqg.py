@@ -477,6 +477,7 @@ def train():
     since = time.time()
     for epoch in range(n_epoch):
         for j, data in enumerate(train_loader):
+            torch.cuda.nvtx.range_push("loop")
             step += 1
             train_x, train_y = data
             train_x = train_x.type(FLOAT_DTYPE).to(device)
@@ -488,6 +489,7 @@ def train():
                 critic_real = discriminator(train_y[:, 0:1, :, :]).mean()
                 critic_fake = discriminator(fake_y).mean()
 
+                torch.cuda.nvtx.range_push("dis backward")
                 loss_critic = -critic_real + critic_fake 
                 opt_critic.zero_grad()
                 loss_critic.backward(retain_graph=True)
@@ -495,12 +497,16 @@ def train():
             
                 for p in discriminator.parameters():
                     p.data.clamp_(-0.01, 0.01)
+                torch.cuda.nvtx.range_pop()
+            torch.cuda.nvtx.range_pop()
             
+            torch.cuda.nvtx.range_push("gen backward")
             gen_fake = discriminator(fake_y).mean()
             loss_gen = -gen_fake
             opt_gen.zero_grad()
             loss_gen.backward()
             opt_gen.step()
+            torch.cuda.nvtx.range_pop()
             print('[epoch: %d, iter: %d] loss: %.4f' % (epoch, j+1, mse_loss.item()))
             # vis.plot_one(step, mse_loss.item(), 'train_loss')
             # vis.plot_one(step, gen_fake.item(), 'g_fake')
@@ -601,9 +607,9 @@ if __name__ == '__main__':
         test(generator, test_loader)
     else:
         train()
-        torch.save(generator.state_dict(), 
-            'output/stgcn_gan_%d.pth' % (n_epoch))
-        test(generator, test_loader)
+        # torch.save(generator.state_dict(), 
+        #     'output/stgcn_gan_%d.pth' % (n_epoch))
+        # test(generator, test_loader)
             
 
 
