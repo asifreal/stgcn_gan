@@ -485,7 +485,7 @@ def train():
             
             for _ in range(n_critic):
                 fake_y = generator(train_x, A)
-                mse_loss = criterion(fake_y, train_y[:,0:1,:,:])
+                mse_loss = criterion(fake_y, train_y[:,0:1,:,:]).detach().item()
                 critic_real = discriminator(train_y[:, 0:1, :, :]).mean()
                 critic_fake = discriminator(fake_y).mean()
 
@@ -494,10 +494,9 @@ def train():
                 opt_critic.zero_grad()
                 loss_critic.backward(retain_graph=True)
                 opt_critic.step()
-            
+                torch.cuda.nvtx.range_pop()
                 for p in discriminator.parameters():
                     p.data.clamp_(-0.01, 0.01)
-                torch.cuda.nvtx.range_pop()
             torch.cuda.nvtx.range_pop()
             
             torch.cuda.nvtx.range_push("gen backward")
@@ -507,7 +506,7 @@ def train():
             loss_gen.backward()
             opt_gen.step()
             torch.cuda.nvtx.range_pop()
-            print('[epoch: %d, iter: %d] loss: %.4f' % (epoch, j+1, mse_loss.item()))
+            print('[epoch: %d, iter: %d] loss: %.4f' % (epoch, j+1, mse_loss))
             # vis.plot_one(step, mse_loss.item(), 'train_loss')
             # vis.plot_one(step, gen_fake.item(), 'g_fake')
             # vis.plot_many_stack(step, {'d_loss': loss_critic.item(), 'g_loss': loss_gen.item()})
